@@ -1,68 +1,88 @@
-import React, { useState } from "react"
-import { QrReader } from "@blackbox-vision/react-qr-reader"
-import Wrapper from "./style"
+import React, { useState, useEffect, useRef } from "react";
+import QrScanner from "qr-scanner";
+import Wrapper from "./style";
 
 const Scanner = () => {
-  const [scannedData, setScannedData] = useState("")
-  const [status, setStatus] = useState("")
-  const [message, setMessage] = useState("")
-  const [isScanning, setIsScanning] = useState(false)
+  const [scannedData, setScannedData] = useState("");
+  const [status, setStatus] = useState("");
+  const [message, setMessage] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+
+  const videoRef = useRef(null);
+  const scannerRef = useRef(null);
+  
+  useEffect(() => {
+    if (isScanning && videoRef.current) {
+      scannerRef.current = new QrScanner(
+        videoRef.current,
+        (result) => handleScan(result?.data), 
+        { preferredCamera: "environment" }
+      );
+
+      scannerRef.current
+        .start()
+        .catch((err) => {
+          console.error("Scanner Error:", err);
+          setStatus("Error");
+          setMessage("Failed to start the scanner.");
+        });
+
+      return () => {
+        scannerRef.current?.stop();
+      };
+    }
+  }, [isScanning]);
 
   const handleScan = async (result) => {
-    if (result?.text) {
-      setScannedData(result.text)
-      setIsScanning(false)
+    if (result) {
+      console.log("QR Code Detected:", result);
+      setScannedData(result);
+      setIsScanning(false); 
+      scannerRef.current?.stop();
 
       try {
-        const response = await fetch("http://localhost:5000/scan", {
+        const response = await fetch(`https://seat-booking-backend-sand.vercel.app/scan`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ qrData: result.text }),
-        })
+          body: JSON.stringify({ qrData: result }),
+        });
 
-        const data = await response.json()
-
-        if (data.status === "Booked") {
-          setStatus("Booked");
-        } else {
-          setStatus("Not Booked")
+        if (!response.ok) {
+          throw new Error(`Server Error: ${response.status}`);
         }
 
-        setMessage(data.message)
+        const data = await response.json();
+        console.log("API Response:", data);
+
+        setStatus(data.status === "Booked" ? "Booked" : "Not Booked");
+        setMessage(data.message);
       } catch (error) {
-        console.error("Error scanning QR code:", error);
+        console.error("API Fetch Error:", error);
         setStatus("Error");
-        setMessage("Something went wrong");
+        setMessage("Something went wrong while checking the QR code.");
       }
     }
-  }
-
-  const handleError = (error) => {
-    console.error("Scanner Error:", error);
-    setStatus("Error");
-    setMessage("Error scanning QR code");
-  }
+  };
 
   return (
     <Wrapper>
-      <h2>QR Code Scanner</h2>
+      <div className="scanner">
+        <h2>QR Code Scanner</h2>
 
-      <button onClick={() => setIsScanning(true)}>Open Scanner</button>
+        <button onClick={() => setIsScanning((prev) => !prev)}>
+          {isScanning ? "Close Scanner" : "Open Scanner"}
+        </button>
 
-      {isScanning && (
-        <QrReader
-          onResult={handleScan}
-          onError={handleError}
-          constraints={{ facingMode: "environment" }}
-          containerStyle={{ width: "100%", marginTop: "10px" }}
-        />
-      )}
+        {isScanning && (
+          <video ref={videoRef} />
+        )}
 
-      <p><strong>Scanned Data:</strong> {scannedData}</p>
-      <p><strong>Status:</strong> {status}</p>
-      <p>{message}</p>
+        <p><strong>Scanned Data:</strong> {scannedData || "No data scanned yet."}</p>
+        <p><strong>Status:</strong> {status || "Waiting for scan..."}</p>
+        <p>{message}</p>
+      </div>
     </Wrapper>
-  )
-}
+  );
+};
 
-export default Scanner
+export default Scanner;

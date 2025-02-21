@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@blackbox-vision/react-qr-reader": "^5.0.0",
     "cra-template": "1.2.0",
+    "qr-scanner": "^1.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-qr-reader": "^3.0.0-beta-1",
+    "react-router-dom": "^7.2.0",
     "react-scripts": "5.0.1",
     "styled-components": "^6.1.15"
   },
